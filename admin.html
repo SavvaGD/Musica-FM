@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Musica FM — Пульт</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: white;
+            font-family: Arial;
+            text-align: center;
+            padding: 20px;
+        }
+        .panel {
+            background: #2d2d2d;
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 15px;
+        }
+        h1 { color: #ff3b3b; }
+        button {
+            background: #ff3b3b;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 20px;
+            border-radius: 50px;
+            margin: 10px;
+            cursor: pointer;
+        }
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+        #status {
+            padding: 20px;
+            font-size: 18px;
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            margin: 10px;
+            border-radius: 5px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="panel">
+        <h1>🎙 MUSICA FM</h1>
+        
+        <div id="loginForm">
+            <input type="password" id="pass" placeholder="Пароль">
+            <button onclick="login()">Войти</button>
+        </div>
+        
+        <div id="adminPanel" style="display:none">
+            <div id="status">Ожидание джингла...</div>
+            <button id="liveBtn" disabled onclick="startLive()">🎤 Вторгнуться в эфир</button>
+            <button onclick="jingleNow()">🎵 МФМ сейчас</button>
+        </div>
+    </div>
+
+    <script>
+        const PASS = 'musica2024';
+        let canLive = false;
+        
+        function login() {
+            if (document.getElementById('pass').value === PASS) {
+                document.getElementById('loginForm').style.display = 'none';
+                document.getElementById('adminPanel').style.display = 'block';
+                checkStatus();
+                setInterval(checkStatus, 2000);
+            }
+        }
+        
+        async function checkStatus() {
+            const res = await fetch('/live-status');
+            const status = await res.text();
+            canLive = status.includes('live_ready');
+            document.getElementById('liveBtn').disabled = !canLive;
+            document.getElementById('status').textContent = canLive ? 
+                '🎤 МОЖНО ВТОРГАТЬСЯ!' : '⏳ Жди "Мьюзика эфэм"...';
+        }
+        
+        function jingleNow() {
+            fetch('/jingle-now');
+        }
+        
+        async function startLive() {
+            document.getElementById('liveBtn').disabled = true;
+            document.getElementById('status').textContent = '🔴 ПРЯМОЙ ЭФИР!';
+            
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = async (e) => {
+                await fetch('/live-stream', {
+                    method: 'POST',
+                    body: e.data
+                });
+            };
+            
+            mediaRecorder.start(1000);
+            
+            setTimeout(() => {
+                mediaRecorder.stop();
+                stream.getTracks().forEach(t => t.stop());
+                document.getElementById('status').textContent = 'Эфир завершён';
+            }, 60000);
+        }
+    </script>
+</body>
+</html>
